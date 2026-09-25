@@ -1,0 +1,7 @@
+{
+  "name": "question-bank-recovered",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  }
+}

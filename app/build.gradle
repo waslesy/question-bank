@@ -1,0 +1,55 @@
+apply plugin: "com.android.application"
+
+def releaseStorePath = System.getenv("QBANK_RELEASE_STORE_FILE")
+def releaseStorePassword = System.getenv("QBANK_RELEASE_STORE_PASSWORD")
+def releaseKeyPassword = System.getenv("QBANK_RELEASE_KEY_PASSWORD")
+def releaseSigningReady = [releaseStorePath, releaseStorePassword, releaseKeyPassword].every { it != null && !it.isBlank() }
+
+android {
+    namespace "com.questionbank"
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.questionbank"
+        minSdk 23
+        targetSdk 35
+        versionCode 3
+        versionName "1.0.2"
+    }
+
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile file(releaseStorePath)
+                storePassword releaseStorePassword
+                keyAlias "questionbank-release"
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".recovered"
+        }
+        release {
+            minifyEnabled false
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name in ["assembleRelease", "bundleRelease", "packageRelease"] && !releaseSigningReady) {
+        task.doFirst {
+            throw new GradleException("Release signing requires QBANK_RELEASE_STORE_FILE, QBANK_RELEASE_STORE_PASSWORD, and QBANK_RELEASE_KEY_PASSWORD.")
+        }
+    }
+}

@@ -1,0 +1,23 @@
+# Android and Gradle outputs
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+
+# Signing secrets and local configuration
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+keystore.properties
+signing.properties
+.env
+.env.*
+
+# Editors and operating systems
+.idea/
+*.iml
+.DS_Store
+Thumbs.db

@@ -1,0 +1,35 @@
+{
+  "format": "medical-question-bank",
+  "version": 1,
+  "subjects": [
+    {
+      "id": "immunology",
+      "name": "免疫学",
+      "short": "免"
+    }
+  ],
+  "questions": [
+    {
+      "id": "immunology-school-q0001",
+      "subjectId": "immunology",
+      "chapter": "第七章 超敏反应",
+      "path": [
+        "基础医学执业医师考试辅导题目汇总",
+        "免疫学",
+        "第七章 超敏反应"
+      ],
+      "stem": "关于Ⅰ型超敏反应的描述，正确的是",
+      "options": [
+        "主要由IgE介导",
+        "主要由IgG介导",
+        "主要由免疫复合物介导",
+        "主要由细胞毒性T细胞介导"
+      ],
+      "answer": "A",
+      "analysis": "本题考查：Ⅰ型超敏反应的主要介导抗体。\n考点还原：Ⅰ型超敏反应属于速发型超敏反应，主要由特异性IgE与肥大细胞、嗜碱性粒细胞参与。\n全选项解析：\nA. IgE是Ⅰ型超敏反应的主要介导抗体，符合题意。\nB. IgG常参与Ⅱ型或Ⅲ型超敏反应，不是本题所问的主要介质。\nC. 免疫复合物沉积是Ⅲ型超敏反应的核心机制。\nD. 细胞毒性T细胞介导的迟发反应属于Ⅳ型超敏反应。\n结论：选择A，Ⅰ型超敏反应主要由IgE介导。",
+      "context": "",
+      "number": 1,
+      "type": "A1"
+    }
+  ]
+}

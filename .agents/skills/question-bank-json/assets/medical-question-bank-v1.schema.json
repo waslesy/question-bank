@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/question-bank-app/question-bank-app/.agents/skills/question-bank-json/assets/medical-question-bank-v1.schema.json",
+  "title": "Canonical medical-question-bank v1",
+  "description": "Strict import-ready profile for the com.questionbank Android app.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "subjects", "questions"],
+  "properties": {
+    "format": {"const": "medical-question-bank"},
+    "version": {"const": 1},
+    "subjects": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/subject"}
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/question"}
+    }
+  },
+  "$defs": {
+    "nonBlank100": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "\\S",
+      "not": {"enum": ["__proto__", "constructor", "prototype"]}
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "short"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,100}$",
+          "not": {"enum": ["__proto__", "constructor", "prototype"]}
+        },
+        "name": {"type": "string", "minLength": 1, "maxLength": 100, "pattern": "\\S"},
+        "short": {"type": "string", "minLength": 1, "maxLength": 8, "pattern": "\\S"}
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "subjectId", "chapter", "path", "stem", "options", "answer", "analysis", "context", "number", "type"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "^[^\\u0000-\\u001F\\u007F]+$",
+          "not": {"enum": ["__proto__", "constructor", "prototype"]}
+        },
+        "subjectId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,100}$",
+          "not": {"enum": ["__proto__", "constructor", "prototype"]}
+        },
+        "subject": {"type": "string", "minLength": 1, "maxLength": 100, "pattern": "\\S"},
+        "chapter": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "pattern": "\\S",
+          "not": {"enum": ["__proto__", "constructor", "prototype"]}
+        },
+        "path": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {"$ref": "#/$defs/nonBlank100"}
+        },
+        "stem": {"type": "string", "minLength": 1, "maxLength": 20000, "pattern": "\\S"},
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1, "maxLength": 10000, "pattern": "\\S"}
+        },
+        "answer": {"type": "string", "enum": ["A", "B", "C", "D", "E"]},
+        "analysis": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[\\s\\S]*本题考查[：:][\\s\\S]*考点还原[：:][\\s\\S]*全选项解析[：:][\\s\\S]*结论[：:][\\s\\S]*$"
+        },
+        "context": {"type": "string"},
+        "number": {"type": "integer", "minimum": 1},
+        "type": {"type": "string", "enum": ["A1", "A2", "A3", "A4", "B1"]}
+      }
+    }
+  }
+}

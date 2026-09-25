@@ -1,0 +1,20 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:9.0.1"
+    }
+}
+
+tasks.register("testWeb", Exec) {
+    workingDir rootDir
+    commandLine "node", "--test", "tests/*.test.js"
+}
+
+subprojects {
+    tasks.matching { it.name == "test" }.configureEach {
+        dependsOn rootProject.tasks.named("testWeb")
+    }
+}
