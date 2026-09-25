@@ -1,34 +1,32 @@
 # Question Bank App
 
-Maintainable source for the empty-shell Android question-bank app.
+本地离线医学刷题 App，采用空壳发布方式：不内置题库、广告、课程或论坛内容。首次使用需要自行导入题库 JSON。
 
-- The app contains no bundled question bank. A fresh install starts with zero questions.
-- JSON import, domain exports, full backup, Legacy Backup migration, progress, favorites, wrong questions, and slashed-question recovery remain available.
-- The release application ID is `com.questionbank`; debug alone adds `.recovered`.
-- Medical question content is maintained outside this repository. The local Skill defines and validates the import contract.
+## 基本操作
 
-## Build and test
+操作逻辑与常见刷题软件类似：
 
-Local build prerequisites used during recovery:
+- 点击：选择项目。
+- 长按：排除该项目。
+- 再次长按：解除排除。
 
-- JDK 21
-- Android SDK 36
-- Gradle 9.1 / Android Gradle Plugin 9.0.1
+## 练习模式
 
-Run `npm test` and `gradlew.bat test lint assembleDebug`. Set `JAVA_HOME` and `ANDROID_HOME` if they are not already configured.
+- 按章节练习：集中练习某个科目下的指定章节。
+- 按来源练习：按题库来源或资料层级浏览和练习。
+- 全科随机：从全部可练习题目中随机抽题。
+- 科目随机：从当前科目的可练习题目中随机抽题。
 
-## Release signing
+## 题库构建
 
-The release alias is fixed to `questionbank-release`. Keystores and passwords stay outside Git.
+仓库提供题库 JSON Skill：
 
-1. Run `tools/signing/create-release-keystore.ps1`; `keytool` prompts locally for passwords.
-2. Set `QBANK_RELEASE_STORE_FILE`, `QBANK_RELEASE_STORE_PASSWORD`, and `QBANK_RELEASE_KEY_PASSWORD` in the local build environment.
-3. Run `gradlew.bat assembleRelease`.
+`.agents/skills/question-bank-json/`
 
-Release tasks fail when any signing environment variable is missing. Never place the keystore or passwords in this repository.
+首次使用时，可以把这个 Skill 与包含题目的资料一起交给支持文件或图片读取的 AI，例如 TXT、Markdown、PDF、Word、PNG、JPG 等题目截图或扫描件，让 AI 按 Skill 规范生成 `medical-question-bank` JSON，并通过 Validator 检查后，再导入 App 使用。
 
-## State model
+不要让 AI 直接自创 JSON 格式，应始终遵循仓库 Skill。正式题库解析应包含：`本题考查`、`考点还原`、`全选项解析`、`结论`。
 
-`app/src/main/assets/state-model.js` contains the pure chapter-state operations used by the WebView UI. Persisted app state is version 2 and adds an independent `slashed` question-ID array. Loading a version 1 backup preserves the existing answers, history, wrong questions, favorites, resume point, totals, statistics, and settings while initializing `slashed` to an empty array.
+## 数据
 
-The Android `test` task also runs the JavaScript suite before its unit-test lifecycle.
+App 支持错题、收藏、斩题、答题记录，以及分域导出、完整备份和恢复。
