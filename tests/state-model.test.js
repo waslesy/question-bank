@@ -41,6 +41,37 @@ test('斩题后从普通训练集合排除', () => {
   assert.deepEqual(model.trainableQuestions(rows, state).map(q => q.id), ['chapter-a-1', 'chapter-a-3']);
 });
 
+test('章节完成度和进度只统计当前可训练题，保留已斩题历史口径', () => {
+  const state = baseState();
+  state.answers = {
+    'chapter-a-1': { selected: 'A', correct: true },
+    'chapter-a-2': { selected: 'B', correct: false }
+  };
+  state.slashed = ['chapter-a-2'];
+  const metrics = model.chapterMetrics(rows, state);
+  assert.equal(metrics.trainableCount, 2);
+  assert.equal(metrics.answeredTrainableCount, 1);
+  assert.equal(metrics.completionPercent, 50);
+  assert.equal(metrics.status, 'started');
+  assert.equal(metrics.answeredCount, 2);
+  assert.equal(metrics.accuracy, 50);
+});
+
+test('已斩题后完成剩余题目即完成章节', () => {
+  const state = baseState();
+  state.answers = {
+    'chapter-a-1': { selected: 'A', correct: true },
+    'chapter-a-2': { selected: 'B', correct: false },
+    'chapter-a-3': { selected: 'A', correct: true }
+  };
+  state.slashed = ['chapter-a-2'];
+  const metrics = model.chapterMetrics(rows, state);
+  assert.equal(metrics.completionPercent, 100);
+  assert.equal(metrics.status, 'completed');
+  assert.equal(metrics.answeredCount, 3);
+  assert.equal(metrics.answeredTrainableCount, 2);
+});
+
 test('斩题不删除答题历史', () => {
   const state = baseState();
   state.answerHistory = [{ questionId: 'chapter-a-2', isCorrect: false }];

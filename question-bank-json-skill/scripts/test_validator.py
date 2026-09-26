@@ -8,6 +8,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Test the canonical Validator in this Skill directory.
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import validate_question_bank as validator
+
 HERE = Path(__file__).resolve().parent
 SKILL = HERE.parent
 VALIDATOR = HERE / "validate_question_bank.py"
@@ -43,6 +48,7 @@ def main() -> int:
     example = json.loads(EXAMPLE.read_text("utf-8"))
     schema = json.loads(SCHEMA.read_text("utf-8"))
     assert schema["$defs"]["question"]["properties"]["analysis"]["minLength"] == 1
+    assert validator.MAX_UTF16_UNITS == 64 * 1024 * 1024
 
     good = run(EXAMPLE)
     assert good.returncode == 0, good.stdout + good.stderr
@@ -76,6 +82,18 @@ def main() -> int:
     analysis = data["questions"][0]["analysis"]
     data["questions"][0]["analysis"] = analysis.replace("本题考查：Ⅰ型超敏反应的主要介导抗体。\n", "") + "\n本题考查：移到末尾。"
     assert_invalid(data, "sections must be ordered")
+
+    data = copy.deepcopy(example)
+    data["questions"][0]["analysis"] = data["questions"][0]["analysis"].replace(
+        "考点还原：Ⅰ型超敏反应属于速发型超敏反应，主要由特异性IgE与肥大细胞、嗜碱性粒细胞参与。",
+        "考点还原：根据相关知识。"
+    )
+    assert_invalid(data, "section '考点还原' must contain substantive medical rationale")
+
+    for phrase in ("正确", "错误", "不符合题意", "根据相关知识"):
+        data = copy.deepcopy(example)
+        data["questions"][0]["analysis"] = data["questions"][0]["analysis"].replace("A. IgE是Ⅰ型超敏反应的主要介导抗体，符合题意。", f"A. {phrase}")
+        assert_invalid(data, "option A explanation must contain a substantive reason")
 
     data = copy.deepcopy(example)
     data["questions"].append(copy.deepcopy(data["questions"][0]))

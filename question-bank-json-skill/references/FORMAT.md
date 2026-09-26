@@ -2,7 +2,7 @@
 
 ## Authority
 
-The maintained App importer in `app/src/main/assets/index.html` defines runtime acceptance. This document defines the stricter repository profile for import-ready question banks. The App may normalize some missing values for legacy compatibility; new files must satisfy this profile directly.
+The maintained App importer in `app/src/main/assets/data-exchange.js` defines runtime acceptance. This document defines the stricter repository profile for import-ready question banks. The App may normalize some missing values for legacy compatibility; new files must satisfy this profile directly.
 
 ## Top-level object
 
@@ -15,7 +15,7 @@ The maintained App importer in `app/src/main/assets/index.html` defines runtime 
 }
 ```
 
-Only these four top-level fields are permitted. A deliverable contains at least one subject and one question. The UTF-8 JSON text must not exceed `12 * 1024 * 1024` JavaScript UTF-16 code units.
+Only these four top-level fields are permitted. A deliverable contains at least one subject and one question. The UTF-8 JSON text must not exceed `64 * 1024 * 1024` JavaScript UTF-16 code units.
 
 ## Subjects
 
@@ -67,9 +67,11 @@ Rules:
 - `本题考查` states the competency or distinction being tested.
 - `考点还原` explains the governing concept and why it applies to the stem.
 - `全选项解析` explains every option actually present using labels `A.` through the final real option. It must distinguish why the correct option is correct and why the others do not fit.
+- `考点还原` must state substantive medical grounds that relate to the stem or tested distinction, not merely repeat the answer.
+- Each actual option explanation must state the medical or logical reason it is correct or incorrect. A bare conclusion such as `正确`, `错误`, `不符合题意`, `符合题意`, or `根据相关知识` is invalid.
 - `结论` states the selected answer and concise reasoning.
 - Headings alone, empty boilerplate, or paraphrasing the answer without reasoning does not satisfy the profile.
-- The Validator checks structure and option coverage. It cannot establish medical truth.
+- The repository Validator rejects empty or boilerplate-only reasoning and checks structure and option coverage. It cannot establish medical truth or prove that a non-boilerplate explanation is medically correct; human review remains required.
 
 If the source answer appears wrong, the stem is insufficient, several options may be valid, the standard may be obsolete, or the medical basis cannot be confirmed, do not resolve the uncertainty by invention. Keep the item out of import-ready output and list it in a separate human-review report.
 

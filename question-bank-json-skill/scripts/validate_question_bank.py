@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict validator for canonical medical-question-bank v1 JSON.
+"""Strict repository validator for canonical medical-question-bank v1 JSON.
 
 No third-party packages required.
 """
@@ -15,7 +15,7 @@ from typing import Any
 
 FORMAT = "medical-question-bank"
 VERSION = 1
-MAX_UTF16_UNITS = 12 * 1024 * 1024
+MAX_UTF16_UNITS = 64 * 1024 * 1024
 BLOCKED = {"__proto__", "constructor", "prototype"}
 SUBJECT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,100}$")
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -23,6 +23,8 @@ VALID_TYPES = {"A1", "A2", "A3", "A4", "B1"}
 ANALYSIS_HEADINGS = ("本题考查", "考点还原", "全选项解析", "结论")
 HEADING_RE = re.compile(r"(?m)^\s*(本题考查|考点还原|全选项解析|结论)\s*[：:]\s*")
 OPTION_ANALYSIS_RE = re.compile(r"(?m)^\s*([A-E])\s*[.．、:：)）]\s*(\S.*)$")
+BOILERPLATE_RE = re.compile(r"正确答案|错误答案|不符合题意|符合题意|根据相关知识(?:可知)?|本项|该项|选项|正确|错误")
+REASON_PUNCTUATION_RE = re.compile(r"[\s，。！？!?、；;：:（）()\[\]【】《》“”‘’\"'.,/_—-]+")
 TOP_KEYS = {"format", "version", "subjects", "questions"}
 SUBJECT_KEYS = {"id", "name", "short"}
 QUESTION_KEYS = {
@@ -150,6 +152,22 @@ def validate_analysis(value: Any, options: list[Any], where: str, report: Report
         report.error(f"{where}.analysis: 全选项解析缺少选项 {label}")
     for label in sorted(parsed - expected):
         report.error(f"{where}.analysis: 全选项解析包含不存在的选项 {label}")
+
+    def substantive_reason(body: str) -> bool:
+        compact = REASON_PUNCTUATION_RE.sub("", body)
+        residual = BOILERPLATE_RE.sub("", compact)
+        return len(residual) >= 8
+
+    knowledge_start = first_matches["考点还原"].end()
+    knowledge_end = first_positions[ANALYSIS_HEADINGS.index("全选项解析")]
+    knowledge_body = value[knowledge_start:knowledge_end].strip()
+    if not substantive_reason(knowledge_body):
+        report.error(f"{where}.analysis: section '考点还原' must contain substantive medical rationale, not boilerplate-only text")
+
+    option_matches = {match.group(1): match.group(2).strip() for match in OPTION_ANALYSIS_RE.finditer(option_body)}
+    for label in sorted(expected & set(option_matches)):
+        if not substantive_reason(option_matches[label]):
+            report.error(f"{where}.analysis: option {label} explanation must contain a substantive reason, not only correct/incorrect boilerplate")
 
 
 def validate_bank(bank: Any, report: Report, label: str = "bank", allow_empty: bool = False) -> dict[str, Any] | None:

@@ -8,10 +8,17 @@
   const FORMAT = 'question-bank-data-exchange';
   const SCHEMA_VERSION = 1;
   const APP_VERSION = '1.0.2';
+  const MAX_IMPORT_SIZE = 64 * 1024 * 1024;
   const EXPORT_TYPES = Object.freeze(['question_bank', 'progress', 'markers', 'settings', 'full_backup']);
   const PROGRESS_KEYS = Object.freeze(['answers', 'answerHistory', 'questionStats', 'last', 'resume', 'totals', 'dailyStats']);
   const MARKER_KEYS = Object.freeze(['favorites', 'wrong', 'slashed']);
   const SETTING_KEYS = Object.freeze(['theme', 'homeTitle', 'homeSlogan']);
+  const CANONICAL_FORMAT = 'medical-question-bank';
+  const CANONICAL_VERSION = 1;
+  const VALID_TYPES = new Set(['A1', 'A2', 'A3', 'A4', 'B1']);
+  const ANALYSIS_HEADINGS = ['本题考查', '考点还原', '全选项解析', '结论'];
+  const ANALYSIS_HEADING_RE = /(^|\n)\s*(本题考查|考点还原|全选项解析|结论)\s*[：:]\s*/g;
+  const ANALYSIS_OPTION_RE = /(^|\n)\s*([A-E])\s*[.．、:：)）]\s*(\S.*)$/gm;
 
   const clone = value => value == null ? value : JSON.parse(JSON.stringify(value));
   const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -25,6 +32,85 @@
     return JSON.stringify({ id: q?.id, subjectId: q?.subjectId, chapter: q?.chapter, path: q?.path, stem: q?.stem, options: q?.options, answer: q?.answer, analysis: q?.analysis || '', context: q?.context || '', number: Number(q?.number) || 0, type: q?.type || 'A1', extra });
   }
   const sameQuestion = (a, b) => questionFingerprint(a) === questionFingerprint(b);
+
+  function canonicalError(message) {
+    throw new Error(`medical-question-bank v1：${message}`);
+  }
+
+  function validateCanonicalAnalysis(value, optionCount, index) {
+    if (typeof value !== 'string' || !value.trim()) canonicalError(`第 ${index + 1} 题解析不能为空`);
+    const matches = [...value.matchAll(ANALYSIS_HEADING_RE)];
+    const positions = new Map(ANALYSIS_HEADINGS.map(heading => [heading, []]));
+    matches.forEach(match => positions.get(match[2]).push(match.index));
+    for (const heading of ANALYSIS_HEADINGS) {
+      if (!positions.get(heading).length) canonicalError(`第 ${index + 1} 题解析缺少“${heading}”段落`);
+      if (positions.get(heading).length > 1) canonicalError(`第 ${index + 1} 题解析重复包含“${heading}”段落`);
+    }
+    const ordered = ANALYSIS_HEADINGS.map(heading => positions.get(heading)[0]);
+    if (ordered.some((position, i) => i && position < ordered[i - 1])) canonicalError(`第 ${index + 1} 题解析四段顺序无效`);
+    for (let i = 0; i < ANALYSIS_HEADINGS.length; i++) {
+      const start = matches.find(match => match.index === ordered[i] && match[2] === ANALYSIS_HEADINGS[i]).index + matches.find(match => match.index === ordered[i] && match[2] === ANALYSIS_HEADINGS[i])[0].length;
+      const end = i + 1 < ANALYSIS_HEADINGS.length ? ordered[i + 1] : value.length;
+      if (!value.slice(start, end).trim()) canonicalError(`第 ${index + 1} 题解析“${ANALYSIS_HEADINGS[i]}”段落不能为空`);
+    }
+    const optionStartMatch = matches.find(match => match.index === ordered[2] && match[2] === '全选项解析');
+    const optionEnd = ordered[3];
+    const parsed = new Set([...value.slice(optionStartMatch.index + optionStartMatch[0].length, optionEnd).matchAll(ANALYSIS_OPTION_RE)].map(match => match[2]));
+    const expected = new Set(Array.from({ length: optionCount }, (_, i) => String.fromCharCode(65 + i)));
+    for (const label of expected) if (!parsed.has(label)) canonicalError(`第 ${index + 1} 题全选项解析缺少选项 ${label}`);
+    for (const label of parsed) if (!expected.has(label)) canonicalError(`第 ${index + 1} 题全选项解析包含不存在的选项 ${label}`);
+  }
+
+  function validateCanonicalQuestionBank(data) {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) canonicalError('顶层必须是对象');
+    const allowedTopKeys = new Set(['format', 'version', 'subjects', 'questions']);
+    const extraTopKeys = Object.keys(data).filter(key => !allowedTopKeys.has(key));
+    const missingTopKeys = [...allowedTopKeys].filter(key => !Object.prototype.hasOwnProperty.call(data, key));
+    if (extraTopKeys.length) canonicalError(`存在未支持的顶层字段：${extraTopKeys.join(', ')}`);
+    if (missingTopKeys.length) canonicalError(`缺少顶层字段：${missingTopKeys.join(', ')}`);
+    if (data.format !== CANONICAL_FORMAT || data.version !== CANONICAL_VERSION) canonicalError('必须是 medical-question-bank 版本 1');
+    if (!Array.isArray(data.subjects) || !data.subjects.length) canonicalError('subjects 必须是非空数组');
+    if (!Array.isArray(data.questions) || !data.questions.length) canonicalError('questions 必须是非空数组');
+
+    const subjects = new Map(), subjectNames = new Set();
+    data.subjects.forEach((subject, index) => {
+      if (!subject || typeof subject !== 'object' || Array.isArray(subject)) canonicalError(`subjects[${index}] 必须是对象`);
+      const keys = Object.keys(subject);
+      if (keys.some(key => !['id', 'name', 'short'].includes(key)) || !['id', 'name', 'short'].every(key => Object.prototype.hasOwnProperty.call(subject, key))) canonicalError(`科目 ${index + 1} 的必需字段或字段集合无效`);
+      if (typeof subject.id !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(subject.id) || blocked(subject.id) || subjects.has(subject.id)) canonicalError(`科目 ${index + 1} ID 无效或重复`);
+      if (typeof subject.name !== 'string' || !subject.name.trim() || subject.name.length > 100 || subjectNames.has(subject.name)) canonicalError(`科目 ${index + 1} 名称无效或重复`);
+      if (typeof subject.short !== 'string' || !subject.short.trim() || subject.short.length > 8) canonicalError(`科目 ${index + 1} short 字段无效`);
+      subjects.set(subject.id, subject); subjectNames.add(subject.name);
+    });
+
+    const ids = new Set();
+    data.questions.forEach((q, index) => {
+      if (!q || typeof q !== 'object' || Array.isArray(q)) canonicalError(`第 ${index + 1} 题必须是对象`);
+      const required = ['id', 'subjectId', 'chapter', 'path', 'stem', 'options', 'answer', 'analysis', 'context', 'number', 'type'];
+      const allowed = new Set([...required, 'subject']);
+      const missing = required.filter(key => !Object.prototype.hasOwnProperty.call(q, key));
+      const extra = Object.keys(q).filter(key => !allowed.has(key));
+      if (missing.length) canonicalError(`第 ${index + 1} 题缺少必需字段：${missing.join(', ')}`);
+      if (extra.length) canonicalError(`第 ${index + 1} 题存在未支持字段：${extra.join(', ')}`);
+      if (!validId(q.id) || ids.has(q.id)) canonicalError(`第 ${index + 1} 题 ID 无效或重复`);
+      ids.add(q.id);
+      const subject = subjects.get(q.subjectId);
+      if (!subject) canonicalError(`第 ${index + 1} 题 subjectId 无效`);
+      if (q.subject !== undefined && (typeof q.subject !== 'string' || !q.subject.trim() || q.subject.length > 100 || q.subject !== subject.name)) canonicalError(`第 ${index + 1} 题 subject 字段无效`);
+      if (typeof q.chapter !== 'string' || !q.chapter.trim() || q.chapter.length > 200 || blocked(q.chapter)) canonicalError(`第 ${index + 1} 题 chapter 字段无效`);
+      if (!Array.isArray(q.path) || q.path.length < 2 || q.path.length > 8 || !q.path.every(segment => typeof segment === 'string' && segment.trim() && segment.length <= 100 && !blocked(segment))) canonicalError(`第 ${index + 1} 题 path 字段无效`);
+      if (q.path[q.path.length - 2] !== subject.name || q.path[q.path.length - 1] !== q.chapter) canonicalError(`第 ${index + 1} 题 path 未以“科目名称、章节”结尾`);
+      if (typeof q.stem !== 'string' || !q.stem.trim() || q.stem.length > 20000) canonicalError(`第 ${index + 1} 题 stem 字段无效`);
+      if (!Array.isArray(q.options) || q.options.length < 2 || q.options.length > 5 || !q.options.every(option => typeof option === 'string' && option.trim() && option.length <= 10000)) canonicalError(`第 ${index + 1} 题 options 字段无效`);
+      if (new Set(q.options.map(option => option.trim())).size !== q.options.length) canonicalError(`第 ${index + 1} 题 options 不得重复`);
+      if (typeof q.answer !== 'string' || !new RegExp(`^[A-${String.fromCharCode(64 + q.options.length)}]$`).test(q.answer)) canonicalError(`第 ${index + 1} 题答案不在实际选项范围内`);
+      validateCanonicalAnalysis(q.analysis, q.options.length, index);
+      if (typeof q.context !== 'string') canonicalError(`第 ${index + 1} 题 context 必须是文本`);
+      if (!Number.isInteger(q.number) || q.number <= 0) canonicalError(`第 ${index + 1} 题 number 必须是正整数`);
+      if (!VALID_TYPES.has(q.type)) canonicalError(`第 ${index + 1} 题 type 无效`);
+    });
+    return data;
+  }
 
   function manifest(exportType, options = {}) {
     if (!EXPORT_TYPES.includes(exportType)) throw new Error(`未知 exportType：${exportType}`);
@@ -98,7 +184,8 @@
 
   function detectLegacyFormat(data) {
     if (data?.format === 'medical-question-bank' && Number(data.version) === 1) {
-      return { ...manifest('question_bank', { exportedAt: data.exportedAt }), payload: { subjects: clone(data.subjects || []), questions: clone(data.questions || []) }, legacy: true, legacyFormat: 'medical-question-bank v1' };
+      validateCanonicalQuestionBank(data);
+      return { ...manifest('question_bank', { exportedAt: data.exportedAt }), payload: { subjects: clone(data.subjects), questions: clone(data.questions) }, legacy: false, canonical: true, legacyFormat: null };
     }
     if (data?.format === 'medical-question-data' && Number(data.version) === 1) {
       return { ...manifest('full_backup', { exportedAt: data.exportedAt }), payload: legacyFullPayload(data), legacy: true, legacyFormat: 'medical-question-data v1' };
@@ -223,5 +310,5 @@
     return { document: doc, snapshot: result, report: summary };
   }
 
-  return { APP_VERSION, EXPORT_TYPES, FORMAT, MARKER_KEYS, PROGRESS_KEYS, SCHEMA_VERSION, SETTING_KEYS, applyImport, applyMarkers, applyProgress, applySettings, createExport, detectLegacyFormat, manifest, mergeQuestionBank, normalizeQuestionBank, parseEnvelope };
+  return { APP_VERSION, EXPORT_TYPES, FORMAT, MAX_IMPORT_SIZE, MARKER_KEYS, PROGRESS_KEYS, SCHEMA_VERSION, SETTING_KEYS, applyImport, applyMarkers, applyProgress, applySettings, createExport, detectLegacyFormat, manifest, mergeQuestionBank, normalizeQuestionBank, parseEnvelope, validateCanonicalQuestionBank };
 });

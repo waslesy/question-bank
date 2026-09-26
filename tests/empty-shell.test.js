@@ -29,8 +29,8 @@ test('空壳状态仍可导入 medical-question-bank v1', () => {
     version: 1,
     subjects: [{ id: 'medicine', name: '医学', short: '医' }],
     questions: [{
-      id: 'medicine-q1', subjectId: 'medicine', chapter: '第一章', path: ['来源', '医学'],
-      stem: '示例题干', options: ['选项 A', '选项 B'], answer: 'A', analysis: '', context: '', number: 1, type: 'A1'
+      id: 'medicine-q1', subjectId: 'medicine', chapter: '第一章', path: ['来源', '医学', '第一章'],
+      stem: '示例题干', options: ['选项 A', '选项 B'], answer: 'A', analysis: '本题考查：示例考点\n考点还原：示例说明\n全选项解析：\nA. 正确。\nB. 错误。\n结论：选择 A。', context: '', number: 1, type: 'A1'
     }]
   };
   const result = exchange.applyImport(bank, empty);

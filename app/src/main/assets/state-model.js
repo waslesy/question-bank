@@ -58,16 +58,18 @@
     const answeredTrainableCount = answeredRows.filter(q => !slashed.has(stableQuestionId(q.id))).length;
     const answeredCount = answeredRows.length;
     const accuracy = answeredCount ? Math.round(correctCount / answeredCount * 100) : null;
-    const completed = answeredCount > 0 && answeredTrainableCount >= trainableCount;
+    const completionPercent = trainableCount ? Math.round(answeredTrainableCount / trainableCount * 100) : 100;
+    const completed = trainableCount === 0 || answeredTrainableCount >= trainableCount;
     return {
       chapterTotal: questions.length,
       slashedCount,
       trainableCount,
+      completionPercent,
       answeredCount,
       answeredTrainableCount,
       correctCount,
       accuracy,
-      status: answeredCount === 0 ? 'unanswered' : completed ? 'completed' : 'started'
+      status: completed ? 'completed' : answeredTrainableCount === 0 ? 'unanswered' : 'started'
     };
   }
 

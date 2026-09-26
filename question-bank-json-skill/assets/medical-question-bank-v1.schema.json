@@ -1,8 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/question-bank-app/question-bank-app/.agents/skills/question-bank-json/assets/medical-question-bank-v1.schema.json",
+  "$id": "https://github.com/question-bank-app/question-bank-app/question-bank-json-skill/assets/medical-question-bank-v1.schema.json",
   "title": "Canonical medical-question-bank v1",
-  "description": "Strict import-ready profile for the com.questionbank Android app.",
+  "description": "Strict import-ready profile for the com.questionbank Android app. The validator and App enforce a 64 MiB UTF-16 JSON text limit.",
+  "$comment": "The whole-file size limit cannot be expressed by JSON Schema and is enforced by the validator and App importer.",
   "type": "object",
   "additionalProperties": false,
   "required": ["format", "version", "subjects", "questions"],
@@ -85,6 +86,7 @@
         "analysis": {
           "type": "string",
           "minLength": 1,
+          "description": "Must contain substantive medical reasoning in 考点还原 and for every actual option; boilerplate-only conclusions are rejected by the repository Validator.",
           "pattern": "^[\\s\\S]*本题考查[：:][\\s\\S]*考点还原[：:][\\s\\S]*全选项解析[：:][\\s\\S]*结论[：:][\\s\\S]*$"
         },
         "context": {"type": "string"},

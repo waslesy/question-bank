@@ -7,6 +7,8 @@ const exchange = require('../app/src/main/assets/data-exchange.js');
 
 const subjects = [{ id: 'medicine', name: '医学', short: '医' }];
 const question = (id, stem = `题干 ${id}`) => ({ id, subjectId: 'medicine', subject: '医学', chapter: '第一章', path: ['来源', '医学'], type: 'A1', number: Number(id.replace(/\D/g, '')) || 1, stem, options: ['选项 A', '选项 B'], answer: 'A', analysis: '解析', context: '' });
+const canonicalAnalysis = (options = ['A', 'B']) => `本题考查：考点\n考点还原：概念说明\n全选项解析：\n${options.map((option, index) => `${String.fromCharCode(65 + index)}. ${option}解析`).join('\n')}\n结论：选择 A`;
+const canonicalQuestion = (id = 'canonical-q1', overrides = {}) => ({ id, subjectId: 'medicine', subject: '医学', chapter: '第一章', path: ['来源', '医学', '第一章'], stem: '正式题干', options: ['选项 A', '选项 B', '选项 C', '选项 D'], answer: 'A', analysis: canonicalAnalysis(['A', 'B', 'C', 'D']), context: '', number: 1, type: 'A1', ...overrides });
 const makeSnapshot = () => ({
   subjects: structuredClone(subjects),
   questions: [question('q1'), question('q2')],
@@ -25,6 +27,10 @@ const makeSnapshot = () => ({
   }
 });
 const keys = value => new Set(Object.keys(value));
+
+test('导入文件硬上限为 64 MB', () => {
+  assert.equal(exchange.MAX_IMPORT_SIZE, 64 * 1024 * 1024);
+});
 
 test('Question Bank export 不包含 progress', () => {
   const out = exchange.createExport('question_bank', makeSnapshot(), { exportedAt: '2026-01-01T00:00:00.000Z' });
@@ -129,10 +135,32 @@ test('Legacy 缺少 slashed 时迁移为 []', () => {
   assert.deepEqual(exchange.parseEnvelope(legacy).payload.markers.slashed, []);
 });
 
-test('Legacy medical-question-bank v1 保持追加语义', () => {
-  const legacy = { format: 'medical-question-bank', version: 1, subjects, questions: [question('q3')] };
-  const result = exchange.applyImport(legacy, makeSnapshot());
-  assert.equal(result.document.exportType, 'question_bank'); assert.equal(result.snapshot.questions.length, 3); assert.equal(result.report.successCount, 1);
+test('正式 medical-question-bank v1 严格校验并保持追加语义', () => {
+  const formal = { format: 'medical-question-bank', version: 1, subjects, questions: [canonicalQuestion()] };
+  const result = exchange.applyImport(formal, makeSnapshot());
+  assert.equal(result.document.exportType, 'question_bank'); assert.equal(result.document.legacy, false); assert.equal(result.snapshot.questions.length, 3); assert.equal(result.report.successCount, 1);
+});
+
+test('正式 v1 拒绝空解析、缺段和缺少实际选项解析', () => {
+  const formal = { format: 'medical-question-bank', version: 1, subjects, questions: [canonicalQuestion()] };
+  assert.throws(() => exchange.parseEnvelope({ ...formal, questions: [canonicalQuestion('q1', { analysis: '' })] }), /解析不能为空/);
+  assert.throws(() => exchange.parseEnvelope({ ...formal, questions: [canonicalQuestion('q1', { analysis: canonicalAnalysis(['A', 'B', 'C', 'D']).replace('考点还原：概念说明\n', '') })] }), /缺少“考点还原”段落/);
+  assert.throws(() => exchange.parseEnvelope({ ...formal, questions: [canonicalQuestion('q1', { analysis: canonicalAnalysis(['A', 'B', 'C']).replace('D. D解析\n', '') })] }), /缺少选项 D/);
+});
+
+test('正式 v1 校验答案、路径和必需字段', () => {
+  const formal = { format: 'medical-question-bank', version: 1, subjects, questions: [canonicalQuestion()] };
+  assert.throws(() => exchange.parseEnvelope({ ...formal, questions: [canonicalQuestion('q1', { answer: 'E' })] }), /答案不在实际选项范围/);
+  assert.throws(() => exchange.parseEnvelope({ ...formal, questions: [canonicalQuestion('q1', { path: ['来源', '医学'] })] }), /path 未以/);
+  const missing = canonicalQuestion(); delete missing.context;
+  assert.throws(() => exchange.parseEnvelope({ ...formal, questions: [missing] }), /缺少必需字段：context/);
+});
+
+test('Legacy Backup 不强制正式解析结构', () => {
+  const legacy = { format: 'medical-question-data', version: 1, bank: { subjects, questions: [question('q3', 'Legacy 题干')] }, state: {} };
+  legacy.bank.questions[0].analysis = '';
+  const parsed = exchange.parseEnvelope(legacy);
+  assert.equal(parsed.legacy, true); assert.equal(parsed.legacyFormat, 'medical-question-data v1'); assert.equal(parsed.payload.questionBank.questions[0].analysis, '');
 });
 
 const realLegacyBackup = path.resolve(__dirname, '../../题库软件数据备份.json');

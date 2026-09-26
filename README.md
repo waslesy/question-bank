@@ -19,9 +19,11 @@
 
 ## 题库构建
 
-仓库提供题库 JSON Skill：
+### Question Bank JSON Skill
 
-`.agents/skills/question-bank-json/`
+完整、可人工复用的 Skill 位于仓库根目录 [`question-bank-json-skill/`](question-bank-json-skill/)。其中 [`SKILL.md`](question-bank-json-skill/SKILL.md) 是主入口， [`references/FORMAT.md`](question-bank-json-skill/references/FORMAT.md) 是格式规范，`assets/` 包含 Schema 与示例，[`scripts/validate_question_bank.py`](question-bank-json-skill/scripts/validate_question_bank.py) 是 Validator。
+
+`.agents/skills/question-bank-json/SKILL.md` 仅作为 Codex 自动发现入口，并引用根目录的单一真源；禁止复制维护两套内容。
 
 首次使用时，可以把这个 Skill 与包含题目的资料一起交给支持文件或图片读取的 AI，例如 TXT、Markdown、PDF、Word、PNG、JPG 等题目截图或扫描件，让 AI 按 Skill 规范生成 `medical-question-bank` JSON，并通过 Validator 检查后，再导入 App 使用。
 
@@ -30,3 +32,5 @@
 ## 数据
 
 App 支持错题、收藏、斩题、答题记录，以及分域导出、完整备份和恢复。
+
+正式 `medical-question-bank` v1 导入必须通过 Schema/Validator 约束：解析非空并包含完整的“本题考查、考点还原、全选项解析、结论”四段，且为实际存在的每个选项提供解析。Legacy Backup 继续按兼容迁移规则导入。单个导入文件上限为 64 MB。
